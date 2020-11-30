@@ -6,12 +6,6 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.common.exceptions import NoSuchElementException
 
 
-MAX_THREADS = 20
-CATEGORIES = {}  # dictionary of category names : list of product names
-PRODUCTS = {}  # dictionary of product names : list of Product objects (specific colors)
-PRODUCT_URLS = {}  # dictionary of product names : URL
-
-
 class Product:
     def __init__(self, name, color, price, sizes, url):
         self.name = name
@@ -58,6 +52,10 @@ def get_links(html):
 
 
 def get_product_details(driver, links):
+    categories = {}  # dictionary of category names : list of product names
+    products = {}  # dictionary of product names : list of Product objects (specific colors)
+    product_urls = {}  # dictionary of product names : URL
+
     try:
         for l in links:
             try:
@@ -69,14 +67,14 @@ def get_product_details(driver, links):
                 category = driver.find_element_by_xpath("//ul[@class='breadcrumbs-1Pb7p breadcrumbs']") \
                     .find_elements_by_tag_name('li')[-1].text  # get category
 
-                if name not in PRODUCTS:  # if this is the first time we encounter this product name
-                    PRODUCTS[name] = []  # add to products dict and init empty list as value
-                    PRODUCT_URLS[name] = l.replace('.com//', '.com/')
+                if name not in products:  # if this is the first time we encounter this product name
+                    products[name] = []  # add to products dict and init empty list as value
+                    product_urls[name] = l.replace('.com//', '.com/')
 
-                    if category not in CATEGORIES:  # if this is the first time we encounter this category
-                        CATEGORIES[category] = []  # add to categories dict and init empty list as value
+                    if category not in categories:  # if this is the first time we encounter this category
+                        categories[category] = []  # add to categories dict and init empty list as value
 
-                    CATEGORIES[category].append(name)  # regardless, append product name to category list
+                    categories[category].append(name)  # regardless, append product name to category list
 
                 for c in driver.find_element_by_class_name('purchase-attributes__color-selector') \
                         .find_elements_by_css_selector("div[role='radio']"):  # find all colors
@@ -108,12 +106,13 @@ def get_product_details(driver, links):
 
                     if len(sizes) > 0:
                         color = Product(name, color, price, sizes, driver.current_url)
-                        PRODUCTS[name].append(color)
+                        products[name].append(color)
             except:
                 pass
     except:
         pass
 
+    return categories, products, product_urls
 
 def main():
     start = time.time()
@@ -121,25 +120,25 @@ def main():
     driver = webdriver.Chrome('/Users/sophiachen/chromedriver')
     url = 'https://shop.lululemon.com/c/sale/_/N-1z0xcuuZ8t6'
 
-    get_product_details(driver, get_links(get_html(driver, url)))
+    categories, products, product_urls = get_product_details(driver, get_links(get_html(driver, url)))
 
     now = datetime.datetime.now()
     file_name = 'wmtm_' + now.strftime("%Y-%m-%d %H:%M:%S") + '.txt'
     file = open(file_name, 'w')
 
-    for category in CATEGORIES:  # iterate through dict
+    for category in categories:  # iterate through dict
         file.write('**' + category.upper() + '**\n')  # key
 
-        product_names = CATEGORIES[category]  # value
+        product_names = categories[category]  # value
         product_names.sort()  # alphabetically sort
 
         for product in product_names:
-            colors = PRODUCTS[product]  # get list of Product objs (for each color)
+            colors = products[product]  # get list of Product objs (for each color)
 
             if len(colors) > 0:
-                file.write('[' + product + ']' + '(' + PRODUCT_URLS[product] + ')\n')
+                file.write('[' + product + ']' + '(' + product_urls[product] + ')\n')
 
-                colors = PRODUCTS[product]
+                colors = products[product]
                 for c in colors:
                     file.write(c.color + ' | ' + c.price + ' | ' + ', '.join(str(i) for i in c.sizes) + '\n')
 
